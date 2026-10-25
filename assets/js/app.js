@@ -25,7 +25,8 @@ function authView(mode = "login", msg = "") {
     ${reg ? `<label>Vor- und Nachname<input name="name" required></label>` : ""}
     <label>E-Mail<input name="email" type="email" required autocomplete="email"></label>
     <label>Passwort<input name="password" type="password" minlength="8" required autocomplete="${reg ? "new-password" : "current-password"}"></label>
-    ${reg ? `<label>Hinweis für die Mitgliedsprüfung (z. B. Mitgliedsnummer)<input name="note" required></label>` : ""}
+    ${reg ? `<label>Hinweis für die Mitgliedsprüfung (z. B. Mitgliedsnummer)<input name="note" required></label>
+    <p class="muted" style="margin:0">Deine Angaben dienen der Prüfung der Mitgliedschaft. Mehr in der <a href="datenschutz.html">Datenschutzerklärung</a>.</p>` : ""}
     <div class="row"><button class="b">${reg ? "Registrieren" : "Anmelden"}</button>
     <button type="button" class="b alt" id="swap">${reg ? "Ich habe schon ein Konto" : "Neu registrieren"}</button></div>
   </form></div>`;
@@ -49,14 +50,14 @@ function pendingView() {
 async function logout() { await sb.auth.signOut(); location.reload(); }
 
 function nav() {
-  const items = [["spots","📍","Futterstellen"],["plans","🗓️","Pläne"]];
+  const items = [["map","🗺️","Karte"],["spots","📍","Futterstellen"],["plans","🗓️","Pläne"]];
   if (me.is_admin) items.push(["admin","✅","Freigeben"]);
   $("#nav").innerHTML = items.map(([k,i,l]) => `<a href="#" data-t="${k}" class="${k === tab ? "active" : ""}"><span>${i}</span>${l}</a>`).join("") +
     `<a href="#" id="out"><span>↩️</span>Abmelden</a>`;
   $("#out").onclick = e => { e.preventDefault(); logout(); };
   document.querySelectorAll("[data-t]").forEach(a => a.onclick = e => { e.preventDefault(); tab = a.dataset.t; nav(); show(); scrollTo(0, 0); });
 }
-const show = () => ({ spots: spotsView, plans: plansView, admin: adminView }[tab])();
+const show = () => ({ map: mapView, spots: spotsView, plans: plansView, admin: adminView }[tab])();
 
 // Fotos vor dem Upload auf max. 1600 px verkleinern (spart kostenlosen Speicher)
 async function shrink(file, max = 1600) {
@@ -70,6 +71,28 @@ async function shrink(file, max = 1600) {
   } catch { return file; }
 }
 
+// ---------- Karte (Leaflet + OpenStreetMap) ----------
+function baseMap(el, center = [52.3045, 7.1595], zoom = 12) {
+  const m = L.map(el).setView(center, zoom);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap-Mitwirkende" }).addTo(m);
+  return m;
+}
+const pin = ll => L.circleMarker(ll, { radius: 11, color: "#fff", weight: 3, fillColor: "#289208", fillOpacity: 1 });
+const route = s => `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}`;
+
+async function mapView() {
+  const { data: spots = [] } = await sb.from("spots").select("id,name,address,lat,lng");
+  const geo = spots.filter(s => s.lat != null);
+  main.innerHTML = `<h1>Karte</h1><div id="map" class="map"></div>
+  <p class="muted">${geo.length} von ${spots.length} Futterstellen haben einen Standort. Fehlende Standorte trägst du unter „Futterstellen“ ein.</p>`;
+  const m = baseMap("map");
+  const pts = geo.map(s => {
+    pin([s.lat, s.lng]).addTo(m).bindPopup(`<b>${esc(s.name)}</b><br>${esc(s.address)}<br><a href="${route(s)}" target="_blank" rel="noopener">Route planen</a>`);
+    return [s.lat, s.lng];
+  });
+  if (pts.length) m.fitBounds(pts, { padding: [40, 40], maxZoom: 16 });
+}
+
 // ---------- Futterstellen ----------
 async function spotsView(editId) {
   const { data: spots = [], error } = await sb.from("spots").select("*").order("name");
@@ -78,7 +101,7 @@ async function spotsView(editId) {
     const { data: files = [] } = await sb.storage.from(BUCKET).list(s.id);
     const paths = (files || []).filter(f => f.name).map(f => `${s.id}/${f.name}`);
     const { data: urls = [] } = paths.length ? await sb.storage.from(BUCKET).createSignedUrls(paths, 3600) : {};
-    return `<div class="card"><h3>${esc(s.name)}</h3><div class="muted">${esc(s.address)}</div><p>${esc(s.notes)}</p>
+    return `<div class="card"><h3>${esc(s.name)}</h3><div class="muted">${esc(s.address)}</div>${s.lat != null ? `<a href="${route(s)}" target="_blank" rel="noopener">Route planen</a>` : ""}<p>${esc(s.notes)}</p>
       <div class="photos">${(urls || []).map(u => `<a href="${u.signedUrl}" target="_blank" rel="noopener"><img src="${u.signedUrl}" alt="Foto ${esc(s.name)}" loading="lazy"></a>`).join("")}</div>
       <div class="row"><button class="b alt" data-edit="${s.id}">Bearbeiten</button>
       <label class="b alt">Foto hinzufügen<input type="file" accept="image/*" hidden data-photo="${s.id}"></label>
@@ -89,12 +112,30 @@ async function spotsView(editId) {
     <label>Name<input name="name" required value="${esc(ed.name)}"></label>
     <label>Standort / Adresse<input name="address" value="${esc(ed.address)}"></label>
     <label class="full">Hinweise (Zugang, Katzen, Besonderheiten)<textarea name="notes" rows="3">${esc(ed.notes)}</textarea></label>
+    <div class="full"><b>Standort</b> <span class="muted">(auf die Karte tippen, um die Futterstelle zu setzen)</span>
+      <div id="pick" class="map small"></div>
+      <input type="hidden" name="lat" value="${ed.lat ?? ""}"><input type="hidden" name="lng" value="${ed.lng ?? ""}">
+      <div class="row" style="margin-top:.5rem"><button type="button" class="b alt s" id="here">Meinen Standort verwenden</button><button type="button" class="b alt s" id="clr">Standort entfernen</button></div></div>
     <div class="row full"><button class="b">${ed.id ? "Änderungen speichern" : "Futterstelle anlegen"}</button>
     ${ed.id ? `<button type="button" class="b alt" id="cancel">Abbrechen</button>` : ""}</div>
   </form><br>${cards.join("") || `<p class="muted">Noch keine Futterstelle eingetragen.</p>`}`;
   $("#cancel")?.addEventListener("click", () => spotsView());
+  const has = ed.lat != null, pm = baseMap("pick", has ? [ed.lat, ed.lng] : undefined, has ? 16 : 12);
+  let mk = null;
+  const setPt = (lat, lng, center) => {
+    $("[name=lat]").value = lat; $("[name=lng]").value = lng;
+    mk ? mk.setLatLng([lat, lng]) : (mk = pin([lat, lng]).addTo(pm));
+    if (center) pm.setView([lat, lng], 17);
+  };
+  if (has) setPt(ed.lat, ed.lng);
+  pm.on("click", e => setPt(+e.latlng.lat.toFixed(6), +e.latlng.lng.toFixed(6)));
+  $("#here").onclick = () => navigator.geolocation?.getCurrentPosition(
+    p => setPt(+p.coords.latitude.toFixed(6), +p.coords.longitude.toFixed(6), true),
+    () => alert("Standort nicht verfügbar. Bitte den Zugriff erlauben oder auf die Karte tippen."));
+  $("#clr").onclick = () => { $("[name=lat]").value = ""; $("[name=lng]").value = ""; mk?.remove(); mk = null; };
   $("#spotf").onsubmit = async e => {
     e.preventDefault(); const f = form(e);
+    f.lat = f.lat === "" ? null : +f.lat; f.lng = f.lng === "" ? null : +f.lng;
     const { error } = ed.id ? await sb.from("spots").update(f).eq("id", ed.id) : await sb.from("spots").insert(f);
     error ? alert(error.message) : spotsView();
   };

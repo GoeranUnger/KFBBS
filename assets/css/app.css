@@ -44,3 +44,13 @@ input,select,textarea{width:100%;font:inherit;font-weight:400;min-height:46px;pa
   main{padding:2rem}
 }
 @media(prefers-reduced-motion:no-preference){.nav a{transition:background .15s}}
+
+.map{height:62vh;min-height:320px;border-radius:14px;border:1px solid var(--line);isolation:isolate}
+.map.small{height:260px;margin-top:.4rem}
+.foot{text-align:center;padding:1rem;font-size:.9rem}
+.foot a,main a{color:var(--gd)}
+.foot a{margin:0 .7rem}
+body.plain{padding:0}
+.plain .top{position:static;width:auto;height:auto;padding-top:.6rem}
+.plain mark{background:#fff4d6;padding:0 .25rem;border-radius:4px}
+.plain dl{margin:0}.plain dt{font-weight:700;margin-top:1rem}.plain dd{margin:.1rem 0 0}

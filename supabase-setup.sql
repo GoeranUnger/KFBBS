@@ -21,6 +21,7 @@ $$ select exists(select 1 from profiles where id = auth.uid() and approved and i
 create table spots (
   id uuid primary key default gen_random_uuid(),
   name text not null, address text, notes text,
+  lat double precision, lng double precision,
   created_by uuid default auth.uid(), created_at timestamptz default now()
 );
 create table plans (
