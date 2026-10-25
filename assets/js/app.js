@@ -1,4 +1,4 @@
-const sb = supabase.createClient(CONFIG.url, CONFIG.key);
+const sb = supabase.createClient(new URL(CONFIG.url.trim()).origin, CONFIG.key.trim()); // nur Host, Pfad/Schrägstrich werden ignoriert
 const BUCKET = "spot-photos", DAYS = ["Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag","Sonntag"];
 const $ = s => document.querySelector(s), main = $("#view");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -51,8 +51,7 @@ async function logout() { await sb.auth.signOut(); location.reload(); }
 function nav() {
   const items = [["spots","📍","Futterstellen"],["plans","🗓️","Pläne"]];
   if (me.is_admin) items.push(["admin","✅","Freigeben"]);
-  $("#nav").innerHTML = `<a href="index.html"><span>🏠</span>Start</a>` +
-    items.map(([k,i,l]) => `<a href="#" data-t="${k}" class="${k === tab ? "active" : ""}"><span>${i}</span>${l}</a>`).join("") +
+  $("#nav").innerHTML = items.map(([k,i,l]) => `<a href="#" data-t="${k}" class="${k === tab ? "active" : ""}"><span>${i}</span>${l}</a>`).join("") +
     `<a href="#" id="out"><span>↩️</span>Abmelden</a>`;
   $("#out").onclick = e => { e.preventDefault(); logout(); };
   document.querySelectorAll("[data-t]").forEach(a => a.onclick = e => { e.preventDefault(); tab = a.dataset.t; nav(); show(); scrollTo(0, 0); });

@@ -4,6 +4,7 @@ body{margin:0;font:16px/1.5 system-ui,"Segoe UI",Roboto,sans-serif;background:va
 .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:.75rem;padding:.6rem 1rem;padding-top:calc(.6rem + env(safe-area-inset-top));background:var(--g);color:#fff;line-height:1.2}
 .top img{width:46px;height:46px;border-radius:12px;background:#fff;padding:3px;object-fit:contain}
 .nav{position:fixed;left:0;right:0;bottom:0;z-index:30;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+.nav:empty{display:none}
 .nav a{display:grid;justify-items:center;align-content:center;min-height:58px;padding:.3rem .1rem;font-size:.75rem;color:var(--mute);text-decoration:none}
 .nav a span{font-size:1.4rem;line-height:1.2}
 .nav a.active{color:var(--g);font-weight:700;box-shadow:inset 0 3px 0 var(--g)}
